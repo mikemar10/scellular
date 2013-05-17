@@ -4,8 +4,11 @@
 
 require 'bundler/setup'
 require 'fog'
+require 'socket'
 
-settings = YAML.load_file('config.yaml')
+# TODO - make config file location configurable
+# TODO - Switch to INI file format
+settings = YAML.load_file(File.expand_path('~/.scellular.conf'))
 
 # STATES
 # Start - check current status against "min" and "max" settings every "poll" seconds  <-|
@@ -16,6 +19,34 @@ settings = YAML.load_file('config.yaml')
 # |       
 # |-> Die - destroy self
 
+# TODO - daemonize
+# TODO - Add CLI options
+# TODO - Pick license
+# TODO - Define monitor return values
+# TODO - Define split script return values
+# TODO - Create providers
+# TODO - Generate unique identifier of each server.
+# TODO - Figure out how to have server identify itself
+
+service = Fog::Compute.new({
+  :provider           => 'rackspace',
+  :rackspace_username => settings["username"],
+  :rackspace_api_key  => settings["api_key"],
+  :version            => :v2,
+  :rackspace_region   => settings["region"].to_sym
+})
+  
+all_servers = service.servers.select {|s| s.state == "ACTIVE"}
+local_ipv4_addresses = Socket.ip_address_list.select {|ip| ip.ipv4? and !ip.ipv4_loopback?}.map(&:ip_address)
+local_server = {}
+all_servers.each do |s|
+  server_addresses = s.addresses.values.flatten.collect {|ip| ip["addr"] if ip["version"] == 4}.reject(&:nil?)
+  local_server[s.id] = (server_addresses - local_ipv4_addresses).length
+end
+
+# TODO - Should this only return if the score was 0?
+local_server = all_servers.select {|s| s.id == local_server.sort_by {|id, score| score}.first[0] }.first
+  
 current_state = :start
 
 loop do
@@ -53,7 +84,7 @@ loop do
       current_state = :start
 
     when :die
-      # TODO - attempt to destroy self
+      local_server.destroy
       sleep(settings["cooldown"])
 
   end

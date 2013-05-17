@@ -1,7 +1,11 @@
+username: some_user
+api_key: 123467890asdfasdf1234567890
+region: dfw
+group: web
 cooldown: 300
 jitter: 120
 poll: 30
-threshold: 0.5
+threshold: 2
 min: 2
 max: 5
 retry: 3
